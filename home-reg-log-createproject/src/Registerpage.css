@@ -1,0 +1,302 @@
+/* src/createproject.css */
+
+/* Container styling */
+.create-container {
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 60px 80px;
+  background-color: #ffffff;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Header styling */
+.create-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.create-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+.create-header p {
+  font-size: 15px;
+  color: #666666;
+  line-height: 1.5;
+}
+
+/* Alert styling */
+.alert {
+  padding: 14px 18px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.alert-error {
+  background-color: #fff5f5;
+  color: #991b1b;
+  border: 1.5px solid #fecaca;
+}
+
+.alert-success {
+  background-color: #f0fdf4;
+  color: #065f46;
+  border: 1.5px solid #bbf7d0;
+}
+
+/* Form styling */
+.create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Form group styling */
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+}
+
+/* Input field styling - WHITE BACKGROUND WITH BLACK TEXT */
+.form-input {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 15px;
+  color: #000000 !important; /* BLACK TEXT */
+  background-color: #ffffff !important; /* WHITE BACKGROUND */
+  border: 1.5px solid #d0d0d0;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.form-input::placeholder {
+  color: #888888 !important; /* GRAY PLACEHOLDER */
+  font-size: 14px;
+}
+
+.form-input:focus {
+  background-color: #ffffff !important; /* WHITE ON FOCUS */
+  color: #000000 !important; /* BLACK TEXT ON FOCUS */
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+/* Ensure text is visible when typing */
+.form-input:-webkit-autofill,
+.form-input:-webkit-autofill:hover,
+.form-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #000000 !important;
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  background-color: #ffffff !important;
+}
+
+/* Textarea styling - WHITE BACKGROUND */
+.form-textarea {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 15px;
+  color: #000000 !important; /* BLACK TEXT */
+  background-color: #ffffff !important; /* WHITE BACKGROUND */
+  border: 1.5px solid #d0d0d0;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.3s ease;
+  resize: vertical;
+  min-height: 120px;
+  font-family: inherit;
+}
+
+.form-textarea::placeholder {
+  color: #888888 !important;
+  font-size: 14px;
+}
+
+.form-textarea:focus {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+/* Ensure textarea text is visible when typing */
+.form-textarea:-webkit-autofill,
+.form-textarea:-webkit-autofill:hover,
+.form-textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: #000000 !important;
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  background-color: #ffffff !important;
+}
+
+/* Select dropdown styling - WHITE BACKGROUND */
+.form-select {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 15px;
+  color: #000000 !important; /* BLACK TEXT */
+  background-color: #ffffff !important; /* WHITE BACKGROUND */
+  border: 1.5px solid #d0d0d0;
+  border-radius: 8px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 16px;
+  padding-right: 40px;
+}
+
+.form-select:focus {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.form-select option {
+  color: #000000;
+  background-color: #ffffff;
+}
+
+/* Submit button styling */
+.submit-button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.submit-button {
+  padding: 14px 60px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: #1a1a1a;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.submit-button:hover:not(:disabled) {
+  background-color: #333333;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.submit-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Back/Cancel link section */
+.back-link {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 14px;
+  color: #666666;
+}
+
+.back-link a {
+  color: #4a90e2;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.back-link a:hover {
+  color: #357abd;
+  text-decoration: underline;
+}
+
+/* Hint text */
+.hint {
+  margin-top: 16px;
+  color: #888888;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.hint a {
+  color: #4a90e2;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.hint a:hover {
+  color: #357abd;
+  text-decoration: underline;
+}
+
+/* Required field indicator */
+.required {
+  color: #dc2626;
+  margin-left: 2px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .create-container {
+    padding: 30px 5%;
+  }
+
+  .create-header h1 {
+    font-size: 24px;
+  }
+
+  .create-form {
+    max-width: 100%;
+  }
+
+  .form-input,
+  .form-select,
+  .form-textarea {
+    font-size: 14px;
+    padding: 12px 16px;
+  }
+
+  .submit-button {
+    padding: 12px 50px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .create-container {
+    padding: 25px 4%;
+  }
+
+  .create-header h1 {
+    font-size: 22px;
+  }
+
+  .create-header p {
+    font-size: 14px;
+  }
+}
