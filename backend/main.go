@@ -1,3 +1,80 @@
+// addMaintainer
+func addMaintainer(c *gin.Context) {
+	authedUserID, ok := getUserIDFromContext(c)
+	if !ok {
+		respondErr(c, http.StatusUnauthorized, "invalid user ID in context", nil)
+		return
+	}
+
+	p_id, err := getIntParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		return
+	}
+
+	var req addMaintainerReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body, user_id and user_name are required"})
+		return
+	}
+
+	hasPermission, err := isProjectAdminOrCreator(authedUserID, p_id)
+	if err != nil {
+		if err.Error() == "project not found" {
+			respondErr(c, http.StatusNotFound, "project not found", nil)
+		} else {
+			respondErr(c, http.StatusInternalServerError, "failed to check permissions", err)
+		}
+		return
+	}
+	if !hasPermission {
+		respondErr(c, http.StatusForbidden, "user is not authorized to add maintainers", nil)
+		return
+	}
+
+	tx, err := conn.Begin(context.Background())
+	if err != nil {
+		respondErr(c, http.StatusInternalServerError, "tx begin failed", err)
+		return
+	}
+	defer tx.Rollback(context.Background())
+
+	if _, err := tx.Exec(context.Background(),
+		`INSERT INTO names (id, name) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name`,
+		req.UserID, req.UserName); err != nil {
+		respondErr(c, http.StatusInternalServerError, "failed to upsert user in names table", err)
+		return
+	}
+
+	row := tx.QueryRow(context.Background(),
+		`INSERT INTO maintainers (p_id, user_id, m_name) 
+         VALUES ($1, $2, $3) 
+         RETURNING m_id`,
+		p_id, req.UserID, req.UserName)
+
+	var m_id int
+	if err := row.Scan(&m_id); err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
+			respondErr(c, http.StatusConflict, "user is already a maintainer for this project", err)
+			return
+		}
+		respondErr(c, http.StatusInternalServerError, "failed to add maintainer", err)
+		return
+	}
+
+	if err := tx.Commit(context.Background()); err != nil {
+		respondErr(c, http.StatusInternalServerError, "tx commit failed", err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"m_id":    m_id,
+		"p_id":    p_id,
+		"user_id": req.UserID,
+		"status":  "maintainer added",
+	})
+}
+
 // deleteMaintainer
 func deleteMaintainer(c *gin.Context) {
 	authedUserID, ok := getUserIDFromContext(c)
