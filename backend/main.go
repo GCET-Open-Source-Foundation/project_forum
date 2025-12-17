@@ -20,21 +20,25 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+/*
+ * Global variables
+ */
 var (
+	r     *gin.Engine
 	conn  *pgxpool.Pool
 	auth1 *auth.Auth
 )
 
-// Permission spaces and role constants
 const (
 	SpaceSuperadmins = "superadmins"
 	SpaceAdmins      = "admins"
-	SpaceUsers       = "SpaceUsers" // default user space
+	SpaceUsers       = "SpaceUsers"
 	MemberRole       = "member"
 )
 
-// ---------------- Models ----------------
-
+/*
+ * Structures that define the spine of the project
+ */
 type Project struct {
 	PID         int       `json:"p_id"`
 	Name        string    `json:"name"`
@@ -43,7 +47,7 @@ type Project struct {
 	CreatorName string    `json:"creator_name"`
 	StartDate   time.Time `json:"start_date"`
 	Status      string    `json:"status"`
-	Image       string    `json:"image,omitempty"` // base64 encoded
+	Image       string    `json:"image,omitempty"`
 }
 
 type BufferProject struct {
@@ -78,8 +82,6 @@ type proj_info struct {
 	EndDate     *time.Time `json:"end_date,omitempty"`
 }
 
-// ---------------- Request structs ----------------
-
 type registerReq struct {
 	Username string `json:"username" form:"username" binding:"required"`
 	Password string `json:"password" form:"password" binding:"required"`
@@ -113,8 +115,6 @@ type revokeUserReq struct {
 	UserID int `json:"user_id" binding:"required"`
 }
 
-// ---------------- Helpers ----------------
-
 func respondErr(c *gin.Context, code int, msg string, err error) {
 	if err != nil {
 		log.Printf("Error: %s: %v\n", msg, err)
@@ -131,10 +131,7 @@ func getIntParam(c *gin.Context, name string) (int, error) {
 	return strconv.Atoi(p)
 }
 
-// getUserIDFromContext attempts to find numeric user id in context (user_id_int or user_id).
-// Returns (id, true) if found and parseable to int, otherwise (-1,false)
 func getUserIDFromContext(c *gin.Context) (int, bool) {
-	// check user_id_int set by middleware
 	if v, ok := c.Get("user_id_int"); ok {
 		switch t := v.(type) {
 		case int:
@@ -149,8 +146,6 @@ func getUserIDFromContext(c *gin.Context) (int, bool) {
 			}
 		}
 	}
-
-	// check user_id (string)
 	if v, ok := c.Get("user_id"); ok {
 		switch t := v.(type) {
 		case string:
@@ -168,7 +163,6 @@ func getUserIDFromContext(c *gin.Context) (int, bool) {
 	return -1, false
 }
 
-// HasRole checks permission via auth.Check_permissions for superadmin/admin, returns true for "user"
 func HasRole(userIDStr string, require string) bool {
 	if require == "superadmin" {
 		return auth1.Check_permissions(userIDStr, SpaceSuperadmins, MemberRole)
@@ -182,9 +176,7 @@ func HasRole(userIDStr string, require string) bool {
 	return false
 }
 
-// AssignMemberToSpace upserts into names table and creates permission in auth DB
 func AssignMemberToSpace(userID interface{}, userName, space string) error {
-	// upsert into names table using TEXT id (to support string and numeric ids)
 	_, err := conn.Exec(context.Background(),
 		`INSERT INTO names (id, name) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name`,
 		userID, userName)
@@ -192,7 +184,6 @@ func AssignMemberToSpace(userID interface{}, userName, space string) error {
 		return fmt.Errorf("upsert names failed: %w", err)
 	}
 
-	// ensure we pass a string user id to auth.Create_permissions
 	var uidStr string
 	switch v := userID.(type) {
 	case int:
@@ -219,8 +210,6 @@ func RemoveMemberFromSpace(userID int, space string) error {
 	}
 	return nil
 }
-
-// ---------------- Permission helpers ----------------
 
 func isProjectAdminOrCreator(authedUserID int, p_id int) (bool, error) {
 	authedUserIDStr := uidToStr(authedUserID)
@@ -281,10 +270,6 @@ func isProjectAdminOrCreatorOrMaintainer(authedUserID int, p_id int) (bool, erro
 	return isAllowed, nil
 }
 
-// ---------------- Middleware ----------------
-
-// AuthMiddleware validates JWT from Authorization header and sets user_id and user_id_int in context.
-// Falls back to X-Dummy-User header for local testing.
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authH := c.GetHeader("Authorization")
@@ -307,7 +292,6 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// fallback for local testing
 		dummy := c.GetHeader("X-Dummy-User")
 		if dummy != "" {
 			c.Set("user_id", dummy)
@@ -322,7 +306,6 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// RequireRole checks if current user has the provided high-level role.
 func RequireRole(required string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		val, exists := c.Get("user_id")
@@ -346,9 +329,6 @@ func RequireRole(required string) gin.HandlerFunc {
 	}
 }
 
-// ---------------- Handlers ----------------
-
-// Register endpoint: register user in auth DB, upsert to names (TEXT id) and assign SpaceUsers permission
 func registerUser(c *gin.Context) {
 	var req registerReq
 	if err := c.ShouldBind(&req); err != nil {
@@ -356,21 +336,17 @@ func registerUser(c *gin.Context) {
 		return
 	}
 
-	// Register user in auth DB
 	if err := auth1.Register_user(req.Username, req.Password); err != nil {
 		respondErr(c, http.StatusInternalServerError, "failed to register user", err)
 		return
 	}
 
-	// Upsert into names table using TEXT id (supports numeric and non-numeric usernames)
 	if _, err := conn.Exec(context.Background(),
 		`INSERT INTO names (id, name) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name`,
 		req.Username, req.Username); err != nil {
-		// warn but do not fail registration
 		log.Printf("warning: failed to upsert into names table: %v", err)
 	}
 
-	// Assign default user permission in auth DB (using username string as user_id)
 	if err := auth1.Create_permissions(req.Username, SpaceUsers, MemberRole); err != nil {
 		log.Printf("warning: failed to add default user permission: %v", err)
 	}
@@ -378,7 +354,6 @@ func registerUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "user registered and default permissions assigned", "username": req.Username})
 }
 
-// Login endpoint: validate credentials and return JWT (2 weeks expiry)
 func loginUser(c *gin.Context) {
 	var req registerReq
 	if err := c.ShouldBind(&req); err != nil {
@@ -391,20 +366,19 @@ func loginUser(c *gin.Context) {
 		return
 	}
 
-	token, err := auth1.Generate_token(req.Username, time.Hour*24*14) // 2 weeks
+	token, err := auth1.Generate_token(req.Username, time.Hour*24*14) 
 	if err != nil {
 		respondErr(c, http.StatusInternalServerError, "failed to generate token", err)
 		return
 	}
 
-	// Return token in response and set cookie (optional)
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "session",
 		Value:    token,
 		Path:     "/",
 		Domain:   "",
 		MaxAge:   int((14 * 24 * time.Hour).Seconds()),
-		Secure:   false, // set true in production with HTTPS
+		Secure:   false,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -412,7 +386,6 @@ func loginUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "login successful", "token": token})
 }
 
-// helper: read uploaded file into []byte safely
 func readUploadedFileBytes(fh *multipart.FileHeader) ([]byte, error) {
 	if fh == nil {
 		return nil, nil
@@ -425,7 +398,6 @@ func readUploadedFileBytes(fh *multipart.FileHeader) ([]byte, error) {
 	return io.ReadAll(f)
 }
 
-// get_All_Proj returns all approved projects (includes base64 image)
 func get_All_Proj(c *gin.Context) {
 	rows, err := conn.Query(context.Background(),
 		"SELECT p_id, name, description, creator_id, creator_name, start_date, status, image FROM approved_projects")
@@ -453,8 +425,6 @@ func get_All_Proj(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// createProject accepts multipart form: name, description, image (optional) and stores image as BYTEA.
-// Admins/superadmins: directly into approved_projects. Regular users: into buffer_projects.
 func createProject(c *gin.Context) {
 	creatorID, ok := getUserIDFromContext(c)
 	if !ok {
@@ -462,7 +432,6 @@ func createProject(c *gin.Context) {
 		return
 	}
 
-	// Parse multipart form (max memory ephemeral); Gin's c.FormFile works without explicit ParseMultipartForm
 	name := c.PostForm("name")
 	desc := c.PostForm("description")
 	if name == "" || desc == "" {
@@ -470,7 +439,6 @@ func createProject(c *gin.Context) {
 		return
 	}
 
-	// read uploaded file (optional)
 	var imageBytes []byte
 	if fh, err := c.FormFile("image"); err == nil && fh != nil {
 		if b, err := readUploadedFileBytes(fh); err == nil {
@@ -501,7 +469,6 @@ func createProject(c *gin.Context) {
 		return
 	}
 
-	// regular user: insert into buffer_projects
 	row := conn.QueryRow(context.Background(),
 		`INSERT INTO buffer_projects (name, description, creator_id, creator_name, status, submitted_at, image)
 		 VALUES ($1, $2, $3, (SELECT COALESCE(name,'Unknown') FROM names WHERE id=$3), 'pending', CURRENT_DATE, $4) RETURNING r_id`,
@@ -515,7 +482,6 @@ func createProject(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"r_id": rid, "status": "pending"})
 }
 
-// deleteProject: move approved project to deleted_projects (with image) and delete from approved_projects
 func deleteProject(c *gin.Context) {
 	pid, err := getIntParam(c, "id")
 	if err != nil {
@@ -565,7 +531,6 @@ func deleteProject(c *gin.Context) {
 	}
 	defer tx.Rollback(context.Background())
 
-	// insert into deleted_projects (keep image)
 	_, err = tx.Exec(context.Background(),
 		`INSERT INTO deleted_projects (p_id, name, description, creator_id, creator_name, deleted_date, image)
 		 VALUES ($1,$2,$3,$4,$5,CURRENT_DATE,$6)`,
@@ -575,7 +540,6 @@ func deleteProject(c *gin.Context) {
 		return
 	}
 
-	// delete from approved_projects
 	cmdTag, err := tx.Exec(context.Background(), `DELETE FROM approved_projects WHERE p_id=$1`, pid)
 	if err != nil {
 		respondErr(c, http.StatusInternalServerError, "failed to delete approved project", err)
@@ -594,7 +558,6 @@ func deleteProject(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// addMaintainer
 func addMaintainer(c *gin.Context) {
 	authedUserID, ok := getUserIDFromContext(c)
 	if !ok {
@@ -643,8 +606,8 @@ func addMaintainer(c *gin.Context) {
 	}
 
 	row := tx.QueryRow(context.Background(),
-		`INSERT INTO maintainers (p_id, user_id, m_name) 
-         VALUES ($1, $2, $3) 
+		`INSERT INTO maintainers (p_id, user_id, m_name)
+         VALUES ($1, $2, $3)
          RETURNING m_id`,
 		p_id, req.UserID, req.UserName)
 
@@ -671,7 +634,6 @@ func addMaintainer(c *gin.Context) {
 	})
 }
 
-// deleteMaintainer
 func deleteMaintainer(c *gin.Context) {
 	authedUserID, ok := getUserIDFromContext(c)
 	if !ok {
@@ -726,7 +688,6 @@ func deleteMaintainer(c *gin.Context) {
 	})
 }
 
-// getAllDeletedProjects
 func getAllDeletedProjects(c *gin.Context) {
 	rows, err := conn.Query(context.Background(),
 		"SELECT p_id, name, description, creator_id, creator_name, deleted_date, image FROM deleted_projects")
@@ -753,7 +714,6 @@ func getAllDeletedProjects(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// getMyDeletedProjects
 func getMyDeletedProjects(c *gin.Context) {
 	creatorID, ok := getUserIDFromContext(c)
 	if !ok {
@@ -786,7 +746,6 @@ func getMyDeletedProjects(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// addContributor
 func addContributor(c *gin.Context) {
 	authedUserID, ok := getUserIDFromContext(c)
 	if !ok {
@@ -837,7 +796,7 @@ func addContributor(c *gin.Context) {
 	row := tx.QueryRow(context.Background(),
 		`INSERT INTO contributors (p_id, user_id, c_name)
         VALUES ($1, $2, $3)
-        ON CONFLICT (user_id, p_id) DO NOTHING 
+        ON CONFLICT (user_id, p_id) DO NOTHING
         RETURNING c_id`,
 		p_id, req.UserID, req.UserName)
 
@@ -864,7 +823,6 @@ func addContributor(c *gin.Context) {
 	})
 }
 
-// deleteContributor
 func deleteContributor(c *gin.Context) {
 	authedUserID, ok := getUserIDFromContext(c)
 	if !ok {
@@ -919,7 +877,6 @@ func deleteContributor(c *gin.Context) {
 	})
 }
 
-// getPendingProjects
 func getPendingProjects(c *gin.Context) {
 	rows, err := conn.Query(context.Background(),
 		"SELECT r_id, name, description, creator_id, creator_name, status, submitted_at, image FROM buffer_projects WHERE status='pending'")
@@ -945,7 +902,6 @@ func getPendingProjects(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// approveProject: move buffer -> approved (including image) in a transaction
 func approveProject(c *gin.Context) {
 	val, ok := c.Get("user_id")
 	if !ok {
@@ -975,7 +931,6 @@ func approveProject(c *gin.Context) {
 	}
 	defer tx.Rollback(context.Background())
 
-	// fetch buffer row
 	var name, desc, creatorName, status string
 	var creatorID int
 	var submittedAt time.Time
@@ -992,7 +947,6 @@ func approveProject(c *gin.Context) {
 		return
 	}
 
-	// insert into approved_projects (preserve image)
 	var newPID int
 	err = tx.QueryRow(context.Background(),
 		`INSERT INTO approved_projects (name, description, creator_id, creator_name, start_date, status, image)
@@ -1003,7 +957,6 @@ func approveProject(c *gin.Context) {
 		return
 	}
 
-	// delete from buffer_projects
 	if _, err := tx.Exec(context.Background(), `DELETE FROM buffer_projects WHERE r_id=$1`, rid); err != nil {
 		respondErr(c, http.StatusInternalServerError, "failed to delete buffer project", err)
 		return
@@ -1022,7 +975,6 @@ func approveProject(c *gin.Context) {
 	})
 }
 
-// rejectProject: mark buffer project as rejected (keeps image)
 func rejectProject(c *gin.Context) {
 	rid, err := getIntParam(c, "id")
 	if err != nil {
@@ -1044,7 +996,6 @@ func rejectProject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "rejected"})
 }
 
-// assignSuperAdmin
 func assignSuperAdmin(c *gin.Context) {
 	val, exists := c.Get("user_id")
 	if !exists {
@@ -1081,7 +1032,6 @@ func assignSuperAdmin(c *gin.Context) {
 	})
 }
 
-// assignAdmin
 func assignAdmin(c *gin.Context) {
 
 	val, exists := c.Get("user_id")
@@ -1119,7 +1069,6 @@ func assignAdmin(c *gin.Context) {
 	})
 }
 
-// revokeAdmin
 func revokeAdmin(c *gin.Context) {
 	val, exists := c.Get("user_id")
 	if !exists {
@@ -1151,7 +1100,6 @@ func revokeAdmin(c *gin.Context) {
 	})
 }
 
-// updateProjectStatus
 func updateProjectStatus(c *gin.Context) {
 	authedUserID, ok := getUserIDFromContext(c)
 	if !ok {
@@ -1208,7 +1156,6 @@ func updateProjectStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Project status updated successfully to " + req.NewStatus, "p_id": p_id})
 }
 
-// get_Ongoing
 func get_Ongoing(c *gin.Context) {
 	rows, err := conn.Query(context.Background(),
 		"SELECT p_id, name, description, creator_id, creator_name, start_date, status, image FROM approved_projects WHERE status = 'in_progress'")
@@ -1237,7 +1184,6 @@ func get_Ongoing(c *gin.Context) {
 	c.JSON(http.StatusOK, projects)
 }
 
-// get_Past_Proj
 func get_Past_Proj(c *gin.Context) {
 	rows, err := conn.Query(context.Background(),
 		"SELECT p_id, name, description, creator_id, creator_name, start_date, status, image FROM approved_projects WHERE status = 'completed'")
@@ -1266,7 +1212,6 @@ func get_Past_Proj(c *gin.Context) {
 	c.JSON(http.StatusOK, projects)
 }
 
-// get_UpComing
 func get_UpComing(c *gin.Context) {
 	rows, err := conn.Query(context.Background(),
 		"SELECT p_id, name, description, creator_id, creator_name, start_date, status, image FROM approved_projects WHERE status = 'upcoming'")
@@ -1295,108 +1240,74 @@ func get_UpComing(c *gin.Context) {
 	c.JSON(http.StatusOK, projects)
 }
 
-// ---------------- Routes ----------------
-
-func registerRoutes(r *gin.Engine) {
-	public := r.Group("/")
-	{
-		public.POST("/register", registerUser)
-		public.POST("/login", loginUser)
-
-		// public read endpoints
-		public.GET("/projects/all", get_All_Proj)
-		public.GET("/projects/ongoing", get_Ongoing)
-		public.GET("/projects/upcoming", get_UpComing)
-		public.GET("/projects/past", get_Past_Proj)
-		public.GET("/deleted/all", getAllDeletedProjects) // admin-only also exists under protected route
-	}
-
-	protected := r.Group("/", AuthMiddleware())
-
-	// user-level
-	userRoutes := protected.Group("/", RequireRole("user"))
-	{
-		// create project expects multipart/form-data with optional 'image' file
-		userRoutes.POST("/projects", createProject)
-		userRoutes.DELETE("/projects/:id", deleteProject)
-		userRoutes.GET("/deleted/my", getMyDeletedProjects)
-
-		userRoutes.POST("/projects/:id/maintainers", addMaintainer)
-		userRoutes.DELETE("/projects/:id/maintainers/:user_id", deleteMaintainer)
-
-		userRoutes.POST("/projects/:id/contributors", addContributor)
-		userRoutes.DELETE("/projects/:id/contributors/:user_id", deleteContributor)
-
-		userRoutes.PATCH("/projects/:id/status", updateProjectStatus)
-	}
-
-	// admin-level
-	adminRoutes := protected.Group("/admin", RequireRole("admin"))
-	{
-		adminRoutes.GET("/pending", getPendingProjects)
-		adminRoutes.POST("/approve/:id", approveProject)
-		adminRoutes.POST("/reject/:id", rejectProject)
-		adminRoutes.GET("/deleted/all", getAllDeletedProjects)
-	}
-
-	// superadmin-level
-	superadminRoutes := protected.Group("/superadmin", RequireRole("superadmin"))
-	{
-		superadminRoutes.GET("/admin/pending", getPendingProjects)
-		superadminRoutes.POST("/admin/approve/:id", approveProject)
-		superadminRoutes.POST("/admin/reject/:id", rejectProject)
-
-		superadminRoutes.GET("/deleted/all", getAllDeletedProjects)
-
-		superadminRoutes.POST("/roles/superadmin", assignSuperAdmin)
-		superadminRoutes.POST("/roles/admin", assignAdmin)
-		superadminRoutes.DELETE("/roles/admin", revokeAdmin)
-	}
-}
-
-// ---------------- main ----------------
+/*
+ * The main server file
+ * This here is where the entire cosmos starts ;)
+ */
 
 func main() {
-	// Project DB connection string (used for both project tables and auth.Init)
-	connString := os.Getenv("PF_DB_CONN")
-	if connString == "" {
-		connString = "postgres://postgres:postgres@localhost:5432/project_forum"
+	/*
+	 * Auth connection here
+	 */
+	dbUsername := os.Getenv("DB_USERNAME")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbHost := os.Getenv("DB_HOST")
+	dbName := os.Getenv("DB_NAME")
+	dbPortStr := os.Getenv("DB_PORT")
+
+	if dbUsername == "" || dbPassword == "" || dbHost == "" || dbName == "" || dbPortStr == "" {
+		log.Fatal("one or more required environment variables are missing")
 	}
 
-	var err error
-	conn, err = pgxpool.New(context.Background(), connString)
+	dbPort, err := strconv.ParseUint(dbPortStr, 10, 16)
 	if err != nil {
-		log.Fatalf("Unable to connect to project DB: %v\n", err)
+		log.Fatalf("invalid DB_PORT value: initialize it in .env file maybe? %v", err)
 	}
-	defer conn.Close()
-	fmt.Println("Connected to project_forum DB")
 
-	// Initialize auth library using the same DB (project_forum)
-	// auth.Init(port uint16, db_user, db_pass, db_name string)
-	auth1, err := auth.Init(context.Background(), 5432, "postgres", "postgres", "project_forum")
+	auth1, err := auth.Init(
+		context.Background(),
+		uint16(dbPort),
+		dbUsername,
+		dbPassword,
+		dbName,
+		dbHost,
+	)
 	if err != nil {
-		log.Fatalf("auth.Init failed: %v\n", err)
+		log.Fatalf("auth.Init failed: initialize it in .env file maybe? %v", err)
 	}
+
 	fmt.Println("auth initialized")
 
-	// JWT secret (env override supported)
 	jwtSecret := os.Getenv("JWT_SECRET")
+
+	/*
+	 * JWT init using auth
+	 */
 	if jwtSecret == "" {
-		jwtSecret = "gcet-secret"
-		log.Println("JWT_SECRET not set; using default 'gcet-secret' (change for production)")
+		log.Fatalf("Use a valid JWT key, initialize it in .env file maybe?")
 	}
+
 	if err := auth1.JWT_init(jwtSecret); err != nil {
 		log.Fatalf("auth.JWT_init failed: %v\n", err)
 	}
+
 	fmt.Println("auth JWT initialized")
 
-	r := gin.Default()
+	/*
+	 * Gin connection comes here
+	 * r is now a global variable
+	 * It now has a lot of responsibility
+	 */
+	r = gin.Default()
 	registerRoutes(r)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+	/*
+	 * Server starts here
+	 */
 	log.Printf("Server starting on :%s\n", port)
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v\n", err)
