@@ -9,57 +9,41 @@ import "github.com/gin-gonic/gin"
  * This is like the API map.
  */
 
-func registerRoutes(r *gin.Engine) {
-	public := r.Group("/")
-	{
-		public.POST("/register", registerUser)
-		public.POST("/login", loginUser)
+func register_routes(r *gin.Engine) {
+	/*
+	 * Static sites
+	 */
+	r.Static("/static", "../static")
 
-		// public read endpoints
-		public.GET("/projects/all", get_All_Proj)
-		public.GET("/projects/ongoing", get_Ongoing)
-		public.GET("/projects/upcoming", get_UpComing)
-		public.GET("/projects/past", get_Past_Proj)
-		public.GET("/deleted/all", getAllDeletedProjects)
+	/*
+	 * Routes
+	 */
+	ui := r.Group("/")
+	{
+		ui.GET("/", route_home)
+		ui.GET("/login", route_login)
+		ui.GET("/register", route_register)
+		ui.GET("/create-project", route_create_project)
+		ui.GET("projects/:id", route_project_view)
+
 	}
 
-	protected := r.Group("/", AuthMiddleware())
-
-	userRoutes := protected.Group("/", RequireRole("user"))
+	api := r.Group("/api")
 	{
-		userRoutes.POST("/projects", createProject)
-		userRoutes.DELETE("/projects/:id", deleteProject)
-		userRoutes.GET("/deleted/my", getMyDeletedProjects)
-
-		userRoutes.POST("/projects/:id/maintainers", addMaintainer)
-		userRoutes.DELETE("/projects/:id/maintainers/:user_id", deleteMaintainer)
-
-		userRoutes.POST("/projects/:id/contributors", addContributor)
-		userRoutes.DELETE("/projects/:id/contributors/:user_id", deleteContributor)
-
-		userRoutes.PATCH("/projects/:id/status", updateProjectStatus)
+		api.POST("/register", register_user)
+		api.POST("/otp", send_otp)
+		api.POST("/login", login_user)
+		api.GET("/getuser", getuser)
+		api.GET("/issudo", issudo)
+		api.GET("/isadmin", isadmin)
+		api.POST("/logout", logout)
 	}
 
-	// admin-level
-	adminRoutes := protected.Group("/admin", RequireRole("admin"))
+	user_routes := r.Group("/projects/api")
 	{
-		adminRoutes.GET("/pending", getPendingProjects)
-		adminRoutes.POST("/approve/:id", approveProject)
-		adminRoutes.POST("/reject/:id", rejectProject)
-		adminRoutes.GET("/deleted/all", getAllDeletedProjects)
-	}
-
-	// superadmin-level
-	superadminRoutes := protected.Group("/superadmin", RequireRole("superadmin"))
-	{
-		superadminRoutes.GET("/admin/pending", getPendingProjects)
-		superadminRoutes.POST("/admin/approve/:id", approveProject)
-		superadminRoutes.POST("/admin/reject/:id", rejectProject)
-
-		superadminRoutes.GET("/deleted/all", getAllDeletedProjects)
-
-		superadminRoutes.POST("/roles/superadmin", assignSuperAdmin)
-		superadminRoutes.POST("/roles/admin", assignAdmin)
-		superadminRoutes.DELETE("/roles/admin", revokeAdmin)
+		user_routes.POST("/create-projects", create_project)
+		user_routes.GET("/getall", get_all_projects)
+		user_routes.DELETE("/delete/:id", delete_project)
+		user_routes.GET("/:id", get_project)
 	}
 }

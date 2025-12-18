@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+::selection {
+  background-color: black;
+  color: white;
+}
+
+::-moz-selection { 
+  background-color: black;
+  color: white;
+}
+
+:root {
+    font-family: "inter";
+}
+body {
+    margin: 0;
+    padding: 0;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f4f4f9;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #000000, #000000);
+  border-radius: 10px;
+  border: 2px solid #f4f4f9;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #000000, #000000);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #000000 #f4f4f9;
+}
+
