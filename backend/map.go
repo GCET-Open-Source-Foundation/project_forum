@@ -25,6 +25,7 @@ func register_routes(r *gin.Engine) {
 		ui.GET("/register", route_register)
 		ui.GET("/create-project", route_create_project)
 		ui.GET("projects/:id", route_project_view)
+		ui.GET("/people", route_people)
 
 	}
 

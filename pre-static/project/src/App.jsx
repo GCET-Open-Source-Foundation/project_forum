@@ -1,134 +1,11 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, Calendar, Trash2, User, Menu, X } from "lucide-react";
-
-function Navbar({ user, permissions }) {
-	const [isOpen, setIsOpen] = useState(false);
-
-	const showPeopleTab = permissions.isAdmin || permissions.isSudo;
-
-	const navLinks = [
-		{ name: "PROJECTS", href: "/projects", visible: true },
-		{ name: "PEOPLE", href: "/people", visible: showPeopleTab },
-	];
-
-	const isActive = (path) =>
-		typeof window !== "undefined" && window.location.pathname === path;
-
-	return (
-		<nav className="w-full bg-white border-b-2 border-black font-mono sticky top-0 z-50">
-			<div className="max-w-7xl mx-auto px-4">
-				<div className="flex justify-between items-center h-16">
-					{/* BRAND */}
-					<div className="flex items-center gap-3">
-						<div className="hidden sm:block bg-black text-white text-[10px] px-1.5 py-0.5 border border-black">
-							SYS_NAV_V2
-						</div>
-						<a
-							href="/"
-							className="text-xl font-bold tracking-tighter uppercase flex items-center gap-2 group"
-						>
-							<span className="w-3 h-3 bg-black group-hover:bg-blue-600 transition-colors"></span>
-							DEV_FORUM
-						</a>
-					</div>
-
-					{/* DESKTOP LINKS */}
-					<div className="hidden md:flex space-x-6">
-						{navLinks.map(
-							(link) =>
-								link.visible && (
-									<a
-										key={link.name}
-										href={link.href}
-										className={`text-sm font-bold px-3 py-1 transition-all border border-transparent ${
-											isActive(link.href)
-												? "bg-black text-white border-black"
-												: "text-zinc-500 hover:text-black hover:border-black hover:bg-zinc-100"
-										}`}
-									>
-										{!isActive(link.href) && (
-											<span className="mr-1 text-zinc-300">
-												//
-											</span>
-										)}
-										{link.name}
-									</a>
-								),
-						)}
-					</div>
-
-					{/* USER STATUS */}
-					<div className="hidden md:flex items-center gap-4">
-						{user.username ? (
-							<div className="flex items-center gap-3">
-								<div className="text-right leading-none">
-									<div className="text-[10px] font-bold text-zinc-400 uppercase">
-										LOGGED_IN
-									</div>
-									<div className="text-xs font-bold uppercase">
-										{user.username}
-									</div>
-								</div>
-								<div className="h-8 w-8 bg-black text-white flex items-center justify-center font-bold text-xs border-2 border-black">
-									{user.username.charAt(0).toUpperCase()}
-								</div>
-							</div>
-						) : (
-							<a
-								href="/login"
-								className="text-xs font-bold bg-white border-2 border-black px-4 py-2 hover:bg-black hover:text-white transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
-							>
-								EXECUTE_LOGIN
-							</a>
-						)}
-					</div>
-
-					{/* MOBILE TOGGLE */}
-					<div className="md:hidden flex items-center">
-						<button
-							onClick={() => setIsOpen(!isOpen)}
-							className="border-2 border-black p-1 hover:bg-black hover:text-white transition-colors"
-						>
-							{isOpen ? <X size={24} /> : <Menu size={24} />}
-						</button>
-					</div>
-				</div>
-			</div>
-
-			{/* MOBILE DRAWER */}
-			{isOpen && (
-				<div className="md:hidden border-t-2 border-black bg-zinc-50 border-b-2 absolute w-full left-0 z-50">
-					<div className="p-4 flex flex-col space-y-3">
-						{navLinks.map(
-							(link) =>
-								link.visible && (
-									<a
-										key={link.name}
-										href={link.href}
-										className="block border-2 border-black bg-white p-3 text-sm font-bold uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all"
-									>
-										{link.name}
-									</a>
-								),
-						)}
-						{!user.username && (
-							<a
-								href="/login"
-								className="block border-2 border-black bg-black text-white p-3 text-sm font-bold uppercase text-center mt-4"
-							>
-								LOGIN
-							</a>
-						)}
-					</div>
-				</div>
-			)}
-		</nav>
-	);
-}
+import { useState, useEffect } from "react";
+import { ArrowLeft, Trash2, User, Calendar } from "lucide-react";
+import Navbar from "./Navbar";
 
 // --- MAIN PAGE COMPONENT ---
 export default function ProjectView() {
-	const id = window.location.pathname.split("/").pop();
+	// Robust ID extraction (handles trailing slashes)
+	const id = window.location.pathname.replace(/\/$/, "").split("/").pop();
 
 	const [project, setProject] = useState(null);
 	const [user, setUser] = useState({ username: null, email: null });
@@ -148,12 +25,13 @@ export default function ProjectView() {
 
 		const loadData = async () => {
 			try {
+				// 🟢 FIXED: Added credentials: "include" so cookies/sessions are sent
 				const [projRes, userRes, sudoRes, adminRes] = await Promise.all(
 					[
 						fetch(`/projects/api/${id}`),
-						fetch("/api/getuser"),
-						fetch("/api/issudo"),
-						fetch("/api/isadmin"),
+						fetch("/api/getuser", { credentials: "include" }),
+						fetch("/api/issudo", { credentials: "include" }),
+						fetch("/api/isadmin", { credentials: "include" }),
 					],
 				);
 
@@ -172,11 +50,14 @@ export default function ProjectView() {
 
 				let isSudo = false,
 					isAdmin = false;
+
+				// Safe JSON parsing
 				if (sudoRes.ok) isSudo = (await sudoRes.json()).value;
 				if (adminRes.ok) isAdmin = (await adminRes.json()).value;
 
 				setPermissions({ isSudo, isAdmin });
 			} catch (err) {
+				console.error(err);
 				setError(err.message);
 			} finally {
 				setLoading(false);
@@ -190,10 +71,14 @@ export default function ProjectView() {
 		if (!confirm("CONFIRM DELETION: THIS ACTION IS IRREVERSIBLE.")) return;
 
 		try {
+			// 🟢 FIXED: Added credentials here too, otherwise delete will be unauthorized
 			const res = await fetch(`/projects/api/delete/${id}`, {
 				method: "DELETE",
+				credentials: "include",
 			});
+
 			if (!res.ok) throw new Error("DELETE_EXECUTION_FAILED");
+
 			window.location.href = "/";
 		} catch (err) {
 			alert(err.message);
@@ -210,8 +95,16 @@ export default function ProjectView() {
 
 	if (error || !project) {
 		return (
-			<div className="min-h-screen bg-zinc-100 flex items-center justify-center font-mono text-red-600 font-bold">
-				[!] SYSTEM_ERROR: {error}
+			<div className="min-h-screen bg-zinc-100 flex flex-col items-center justify-center font-mono gap-4">
+				<div className="text-red-600 font-bold text-xl">
+					[!] SYSTEM_ERROR: {error}
+				</div>
+				<button
+					onClick={() => (window.location.href = "/")}
+					className="bg-black text-white px-4 py-2 text-sm hover:bg-zinc-800"
+				>
+					RETURN_INDEX
+				</button>
 			</div>
 		);
 	}
@@ -223,7 +116,7 @@ export default function ProjectView() {
 		<div className="min-h-screen bg-zinc-100 font-mono text-black">
 			<Navbar user={user} permissions={permissions} />
 
-			<div className="max-w-5xl mx-auto p-6">
+			<div className="max-w-5xl mx-auto p-6 mt-6">
 				<button
 					onClick={() => (window.location.href = "/")}
 					className="mb-6 flex items-center gap-2 text-xs font-bold uppercase hover:bg-black hover:text-white px-3 py-1.5 border border-transparent hover:border-black transition-colors w-fit"
@@ -239,10 +132,10 @@ export default function ProjectView() {
 						</div>
 
 						<div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-							<div>
+							<div className="w-full">
 								<div className="flex items-center gap-3 mb-2">
 									<span className="bg-zinc-100 border border-black px-2 py-0.5 text-xs font-bold uppercase">
-										{project.status}
+										{project.status || "UNKNOWN"}
 									</span>
 									<span className="text-zinc-400 text-xs font-bold">
 										// PUBLIC_ACCESS
@@ -304,7 +197,7 @@ export default function ProjectView() {
 										<User size={10} /> Maintainer
 									</h4>
 									<div className="text-sm font-bold break-all">
-										{project.creator_email}
+										{project.creator_email || "ANONYMOUS"}
 									</div>
 								</div>
 
@@ -313,13 +206,18 @@ export default function ProjectView() {
 										<Calendar size={10} /> Created
 									</h4>
 									<div className="text-sm font-bold">
-										{new Date(project.created_at)
-											.toLocaleDateString("en-GB", {
-												day: "2-digit",
-												month: "short",
-												year: "numeric",
-											})
-											.toUpperCase()}
+										{project.created_at
+											? new Date(project.created_at)
+													.toLocaleDateString(
+														"en-GB",
+														{
+															day: "2-digit",
+															month: "short",
+															year: "numeric",
+														},
+													)
+													.toUpperCase()
+											: "N/A"}
 									</div>
 								</div>
 							</div>

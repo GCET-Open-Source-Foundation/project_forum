@@ -1,189 +1,5 @@
 import { useState, useEffect } from "react";
-import { Menu, X, LogOut, Plus } from "lucide-react";
-
-function Navbar() {
-	const [isOpen, setIsOpen] = useState(false);
-	const [username, setUsername] = useState(null);
-	const [hasPrivileges, setHasPrivileges] = useState(false);
-
-	useEffect(() => {
-		const fetchData = async () => {
-			try {
-				const userRes = await fetch("/api/getuser", {
-					credentials: "include",
-				});
-
-				if (userRes.ok) {
-					const userData = await userRes.json();
-					setUsername(userData.username || null);
-				} else {
-					setUsername(null);
-				}
-
-				const [adminRes, sudoRes] = await Promise.all([
-					fetch("/api/isadmin", { credentials: "include" }),
-					fetch("/api/issudo", { credentials: "include" }),
-				]);
-
-				const isAdmin = adminRes.ok && (await adminRes.json()).value;
-				const isSudo = sudoRes.ok && (await sudoRes.json()).value;
-
-				setHasPrivileges(isAdmin || isSudo);
-			} catch {
-				setUsername(null);
-				setHasPrivileges(false);
-			}
-		};
-
-		fetchData();
-	}, []);
-
-	const handleLogout = async () => {
-		await fetch("/api/logout", {
-			method: "POST",
-			credentials: "include",
-		});
-		window.location.replace("/login");
-	};
-
-	const navLinks = [
-		{ name: "PEOPLE", href: "/people", visible: hasPrivileges },
-	];
-
-	return (
-		<nav className="w-full bg-white border-b-2 border-black font-mono sticky top-0 z-50">
-			<div className="max-w-7xl mx-auto px-4">
-				<div className="flex justify-between items-center h-16">
-					<div className="flex items-center gap-3">
-						<div className="hidden sm:block bg-black text-white text-[10px] px-1.5 py-0.5 border border-black">
-							SYS_FORUM_V1
-						</div>
-						<a
-							href="/"
-							className="text-xl font-bold tracking-tighter uppercase flex items-center gap-2 group"
-						>
-							<span className="w-3 h-3 bg-black group-hover:bg-blue-600 transition-colors"></span>
-							DEV_FORUM
-						</a>
-					</div>
-
-					<div className="hidden md:flex space-x-8">
-						{navLinks.map(
-							(link) =>
-								link.visible && (
-									<a
-										key={link.name}
-										href={link.href}
-										className="text-sm font-bold text-zinc-500 hover:text-black hover:bg-zinc-200 px-2 py-1 transition-colors"
-									>
-										<span className="mr-1 text-zinc-300">
-											//
-										</span>
-										{link.name}
-									</a>
-								),
-						)}
-					</div>
-
-					<div className="hidden md:flex items-center gap-3">
-						{hasPrivileges && (
-							<a
-								href="/create-project"
-								className="border-2 border-black p-2 hover:bg-black hover:text-white"
-							>
-								<Plus size={16} />
-							</a>
-						)}
-
-						{username ? (
-							<>
-								<div className="flex items-center gap-2">
-									<span className="text-[10px] font-bold text-zinc-400 uppercase">
-										LOGGED_AS:
-									</span>
-									<span className="text-sm font-bold bg-zinc-100 border-2 border-black px-2 py-0.5">
-										{username}
-									</span>
-									{hasPrivileges && (
-										<span className="text-[10px] bg-red-600 text-white px-1 font-bold">
-											ADMIN
-										</span>
-									)}
-								</div>
-								<button
-									onClick={handleLogout}
-									className="border-2 border-black p-2 hover:bg-red-600 hover:text-white"
-								>
-									<LogOut size={16} />
-								</button>
-							</>
-						) : (
-							<a
-								href="/login"
-								className="text-xs font-bold underline decoration-2 decoration-black underline-offset-4"
-							>
-								LOGIN
-							</a>
-						)}
-					</div>
-
-					<div className="md:hidden flex items-center">
-						<button
-							onClick={() => setIsOpen(!isOpen)}
-							className="border-2 border-black p-1 hover:bg-black hover:text-white transition-colors"
-						>
-							{isOpen ? <X size={24} /> : <Menu size={24} />}
-						</button>
-					</div>
-				</div>
-			</div>
-
-			{isOpen && (
-				<div className="md:hidden border-t-2 p-4 absolute w-full left-0 bg-zinc-50 border-b-2 border-black">
-					<div className="flex flex-col space-y-3">
-						{navLinks.map(
-							(link) =>
-								link.visible && (
-									<a
-										key={link.name}
-										href={link.href}
-										className="block border-2 border-black bg-white p-3 text-sm font-bold uppercase"
-									>
-										{link.name}
-									</a>
-								),
-						)}
-
-						{hasPrivileges && (
-							<a
-								href="/create-project"
-								className="block border-2 border-black bg-white p-3 text-sm font-bold uppercase text-center"
-							>
-								CREATE_PROJECT
-							</a>
-						)}
-
-						{username ? (
-							<button
-								onClick={handleLogout}
-								className="block border-2 border-black bg-red-600 text-white p-3 text-sm font-bold uppercase"
-							>
-								LOGOUT
-							</button>
-						) : (
-							<a
-								href="/login"
-								className="block border-2 border-black bg-black text-white p-3 text-sm font-bold uppercase text-center"
-							>
-								EXECUTE_LOGIN
-							</a>
-						)}
-					</div>
-				</div>
-			)}
-		</nav>
-	);
-}
+import Navbar from "./Navbar";
 
 const STATUS_OPTIONS = ["draft", "active", "archived"];
 
@@ -329,9 +145,44 @@ function CreateProjectForm() {
 }
 
 export default function App() {
+	const [user, setUser] = useState({ username: null });
+	const [permissions, setPermissions] = useState({
+		isAdmin: false,
+		isSudo: false,
+	});
+
+	useEffect(() => {
+		const fetchData = async () => {
+			try {
+				const userRes = await fetch("/api/getuser", {
+					credentials: "include",
+				});
+
+				if (userRes.ok) {
+					const userData = await userRes.json();
+					setUser({ username: userData.username });
+				}
+
+				const [adminRes, sudoRes] = await Promise.all([
+					fetch("/api/isadmin", { credentials: "include" }),
+					fetch("/api/issudo", { credentials: "include" }),
+				]);
+
+				setPermissions({
+					isAdmin: adminRes.ok && (await adminRes.json()).value,
+					isSudo: sudoRes.ok && (await sudoRes.json()).value,
+				});
+			} catch {
+				// Ignore errors, defaults are fine
+			}
+		};
+
+		fetchData();
+	}, []);
+
 	return (
 		<div className="min-h-screen bg-zinc-100 font-mono text-black">
-			<Navbar />
+			<Navbar user={user} permissions={permissions} />
 			<CreateProjectForm />
 		</div>
 	);
