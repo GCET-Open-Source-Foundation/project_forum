@@ -1,99 +1,5 @@
-import { useEffect, useState } from "react";
-import { Plus, LogOut, Menu, X } from "lucide-react";
-
-function Navbar({ user, permissions }) {
-	const [open, setOpen] = useState(false);
-
-	const handleLogout = async () => {
-		await fetch("/api/logout", {
-			method: "POST",
-			credentials: "include",
-		});
-		window.location.replace("/login");
-	};
-
-	return (
-		<nav className="w-full bg-white border-b-2 border-black font-mono sticky top-0 z-50">
-			<div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-				<a
-					href="/"
-					className="font-bold uppercase tracking-tighter flex items-center gap-2"
-				>
-					<span className="w-3 h-3 bg-black"></span>
-					DEV_FORUM
-				</a>
-
-				{/* DESKTOP */}
-				<div className="hidden md:flex items-center gap-3">
-					{user.username ? (
-						<>
-							<div className="text-xs font-bold uppercase border-2 border-black px-3 py-2">
-								{user.username}
-							</div>
-
-							{(permissions.isAdmin || permissions.isSudo) && (
-								<a
-									href="/create-project"
-									className="border-2 border-black p-2 hover:bg-black hover:text-white"
-								>
-									<Plus size={16} />
-								</a>
-							)}
-
-							<button
-								onClick={handleLogout}
-								className="border-2 border-black p-2 hover:bg-red-600 hover:text-white"
-							>
-								<LogOut size={16} />
-							</button>
-						</>
-					) : (
-						<a
-							href="/login"
-							className="border-2 border-black px-4 py-2 font-bold uppercase text-xs hover:bg-black hover:text-white"
-						>
-							Login
-						</a>
-					)}
-				</div>
-
-				{/* MOBILE */}
-				<button
-					onClick={() => setOpen(!open)}
-					className="md:hidden border-2 border-black p-1"
-				>
-					{open ? <X size={20} /> : <Menu size={20} />}
-				</button>
-			</div>
-
-			{open && (
-				<div className="md:hidden border-t-2 border-black bg-white p-4 space-y-3">
-					{user.username ? (
-						<>
-							<div className="border-2 border-black p-3 font-bold uppercase text-sm">
-								{user.username}
-							</div>
-
-							<button
-								onClick={handleLogout}
-								className="w-full border-2 border-black bg-red-600 text-white p-3 font-bold uppercase text-sm"
-							>
-								Logout
-							</button>
-						</>
-					) : (
-						<a
-							href="/login"
-							className="block border-2 border-black bg-black text-white p-3 font-bold uppercase text-sm text-center"
-						>
-							Login
-						</a>
-					)}
-				</div>
-			)}
-		</nav>
-	);
-}
+import { useState, useEffect } from "react"; // 🟢 FIXED: Added missing imports
+import Navbar from "./Navbar";
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
@@ -109,26 +15,37 @@ export default function Login() {
 		isSudo: false,
 	});
 
-	/* Check auth state for navbar */
+	/* Check auth state for navbar & redirect if already logged in */
 	useEffect(() => {
 		(async () => {
-			const [u, s, a] = await Promise.all([
-				fetch("/api/getuser", { credentials: "include" }),
-				fetch("/api/issudo", { credentials: "include" }),
-				fetch("/api/isadmin", { credentials: "include" }),
-			]);
+			try {
+				const [u, s, a] = await Promise.all([
+					fetch("/api/getuser", { credentials: "include" }),
+					fetch("/api/issudo", { credentials: "include" }),
+					fetch("/api/isadmin", { credentials: "include" }),
+				]);
 
-			if (u.ok) {
-				const ud = await u.json();
-				setUser({ username: ud.username });
-			} else {
-				setUser({ username: null });
+				if (u.ok) {
+					const ud = await u.json();
+					setUser({ username: ud.username });
+
+					// 🟢 OPTIONAL FIX: If user is already logged in, redirect them home
+					// window.location.replace("/");
+				} else {
+					setUser({ username: null });
+				}
+
+				// Safe parsing of permissions
+				const sudoData = s.ok ? await s.json() : { value: false };
+				const adminData = a.ok ? await a.json() : { value: false };
+
+				setPermissions({
+					isSudo: sudoData.value,
+					isAdmin: adminData.value,
+				});
+			} catch (err) {
+				console.error("Failed to fetch auth state:", err);
 			}
-
-			setPermissions({
-				isSudo: s.ok && (await s.json()).value,
-				isAdmin: a.ok && (await a.json()).value,
-			});
 		})();
 	}, []);
 
@@ -152,7 +69,7 @@ export default function Login() {
 			const res = await fetch("/api/login", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				credentials: "include", // 🔴 REQUIRED
+				credentials: "include",
 				body: JSON.stringify({ email, password }),
 			});
 
@@ -161,6 +78,7 @@ export default function Login() {
 				throw new Error(data.error || "Login failed");
 			}
 
+			// Force a hard reload to ensure all app states (Context/Navbar) update
 			window.location.replace("/");
 		} catch (err) {
 			setError(err.message);
@@ -173,7 +91,7 @@ export default function Login() {
 		<div className="min-h-screen bg-zinc-100 font-mono">
 			<Navbar user={user} permissions={permissions} />
 
-			<div className="flex items-center justify-center p-4">
+			<div className="flex items-center justify-center p-4 mt-10">
 				<div className="w-full max-w-md bg-white border-2 border-black shadow-[8px_8px_0_#000] p-8 relative">
 					<div className="absolute top-0 left-0 bg-black text-white text-xs px-2 py-1 border-r-2 border-b-2 border-black">
 						SYS_AUTH_V1
@@ -199,7 +117,7 @@ export default function Login() {
 								value={email}
 								onChange={(e) => setEmail(e.target.value)}
 								placeholder="ENTER_EMAIL"
-								className="w-full bg-zinc-50 border-2 border-black p-3 text-sm"
+								className="w-full bg-zinc-50 border-2 border-black p-3 text-sm focus:outline-none focus:bg-zinc-100"
 							/>
 						</div>
 
@@ -213,7 +131,7 @@ export default function Login() {
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
 								placeholder="••••••••"
-								className="w-full bg-zinc-50 border-2 border-black p-3 text-sm"
+								className="w-full bg-zinc-50 border-2 border-black p-3 text-sm focus:outline-none focus:bg-zinc-100"
 							/>
 						</div>
 
@@ -226,7 +144,7 @@ export default function Login() {
 						<button
 							type="submit"
 							disabled={loading}
-							className="w-full bg-black text-white font-bold py-4 disabled:opacity-50"
+							className="w-full bg-black text-white font-bold py-4 hover:bg-zinc-800 transition-colors disabled:opacity-50"
 						>
 							{loading ? "AUTHENTICATING..." : "EXECUTE LOGIN"}
 						</button>

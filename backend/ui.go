@@ -43,3 +43,10 @@ func route_create_project(c *gin.Context) {
 func route_project_view(c *gin.Context) {
 	c.File("../static/project/index.html")
 }
+
+/*
+ * People
+ */
+func route_people(c *gin.Context) {
+	c.File("../static/people/index.html")
+}
