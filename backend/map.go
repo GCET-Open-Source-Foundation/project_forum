@@ -14,6 +14,7 @@ func register_routes(r *gin.Engine) {
 	 * Static sites
 	 */
 	r.Static("/static", "../static")
+	r.POST("/projects/edit/:id", edit_project)
 
 	/*
 	 * Routes
@@ -25,6 +26,7 @@ func register_routes(r *gin.Engine) {
 		ui.GET("/register", route_register)
 		ui.GET("/create-project", route_create_project)
 		ui.GET("projects/:id", route_project_view)
+		ui.GET("projects/edit/:id", route_edit_project)
 		ui.GET("/people", route_people)
 
 	}

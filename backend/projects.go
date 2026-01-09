@@ -149,7 +149,6 @@ func get_project(c *gin.Context) {
  * Get all projects
  */
 func get_all_projects(c *gin.Context) {
-	// FIX: Removed 'begin_date' from SELECT and Scan
 	query := `
 		SELECT
 			id,
@@ -251,4 +250,98 @@ func delete_project(c *gin.Context) {
 	}
 
 	c.Status(204)
+}
+
+/*
+ * Edit an existing project
+ * Checks if the user is the owner (or super-admin)
+ * Updates thumbnail only if a new file is provided
+ */
+func edit_project(c *gin.Context) {
+	projectID := c.Param("id")
+	userEmail := get_username(c)
+
+	if userEmail == "" {
+		c.AbortWithStatusJSON(401, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var creatorEmail string
+	err := auth1.Conn.QueryRow(
+		c.Request.Context(),
+		"SELECT creator_email FROM projects WHERE id = $1",
+		projectID,
+	).Scan(&creatorEmail)
+
+	if err != nil {
+		c.JSON(404, gin.H{"error": "project not found"})
+		return
+	}
+
+	isSudo := auth1.Check_permissions(userEmail, "meta", "super-admin")
+	if creatorEmail != userEmail && !isSudo {
+		c.JSON(403, gin.H{"error": "forbidden"})
+		return
+	}
+
+	name := c.PostForm("name")
+	description := c.PostForm("description")
+	status := c.PostForm("status")
+
+	if name == "" || status == "" {
+		c.JSON(400, gin.H{"error": "missing required fields"})
+		return
+	}
+
+	var thumbnailBytes []byte
+	file, err := c.FormFile("thumbnail")
+
+	if err == nil {
+		f, err := file.Open()
+		if err != nil {
+			c.JSON(400, gin.H{"error": "invalid thumbnail"})
+			return
+		}
+		defer f.Close()
+
+		thumbnailBytes, err = io.ReadAll(io.LimitReader(f, 2<<20+1))
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to read thumbnail"})
+			return
+		}
+		if len(thumbnailBytes) > 2<<20 {
+			c.JSON(400, gin.H{"error": "thumbnail too large (max 2MB)"})
+			return
+		}
+	}
+	
+	var updateErr error
+
+	if len(thumbnailBytes) > 0 {
+		_, updateErr = auth1.Conn.Exec(
+			c.Request.Context(),
+			`UPDATE projects
+			 SET name = $1, description = $2, status = $3, thumbnail = $4, updated_at = NOW()
+			 WHERE id = $5`,
+			name, description, status, thumbnailBytes, projectID,
+		)
+	} else {
+		_, updateErr = auth1.Conn.Exec(
+			c.Request.Context(),
+			`UPDATE projects
+			 SET name = $1, description = $2, status = $3, updated_at = NOW()
+			 WHERE id = $4`,
+			name, description, status, projectID,
+		)
+	}
+
+	if updateErr != nil {
+		c.JSON(500, gin.H{"error": "failed to update project"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "project updated successfully",
+		"id":      projectID,
+	})
 }

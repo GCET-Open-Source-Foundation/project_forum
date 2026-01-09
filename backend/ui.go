@@ -50,3 +50,10 @@ func route_project_view(c *gin.Context) {
 func route_people(c *gin.Context) {
 	c.File("../static/people/index.html")
 }
+
+/*
+ * Edit project
+ */
+func route_edit_project(c *gin.Context) {
+	c.File("../static/edit/index.html")
+}
