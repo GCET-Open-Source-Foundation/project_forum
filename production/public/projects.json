@@ -1,0 +1,28 @@
+[
+	{
+		"id": "quantum-dash",
+		"name": "Quantum Dashboard",
+		"owner": "Sarah Chen",
+		"pay_status": "Paid",
+		"start_date": "2024-01-15",
+		"status": "In Progress",
+		"description": "A high-performance monitoring tool for localized quantum entanglement clusters. Built to handle sub-millisecond telemetry and visualizes real-time data streams via WebSockets.",
+		"tech_stack": ["React", "Rust", "Tailwind", "WebAssembly"],
+		"client": "Aetheria Tech",
+		"budget_code": "XL-99-ALPHA",
+		"notes": "Ensure the UI remains legible under high-stress monitoring scenarios."
+	},
+	{
+		"id": "legacy-mig",
+		"name": "Legacy Migration",
+		"owner": "James Holt",
+		"pay_status": "Pending",
+		"start_date": "2023-11-02",
+		"status": "Completed",
+		"description": "Full-scale migration of COBOL-based banking systems to a modern microservices architecture. Focus on data integrity and zero-downtime cutover.",
+		"tech_stack": ["Java", "AWS", "Docker", "PostgreSQL"],
+		"client": "Global Trust Bank",
+		"budget_code": "FIN-2023-004",
+		"notes": "Compliance audit passed on 2024-01-10."
+	}
+]
